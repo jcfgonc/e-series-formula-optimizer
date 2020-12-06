@@ -38,6 +38,7 @@ public class OptimizingE12 {
 	}
 
 	private static void printResults(ArrayList<DoubleArrayList> results) {
+		System.out.println("error\tr0\t...\trn");
 		for (DoubleArrayList res : results) {
 			System.out.print((res.getDouble(0)) + "\t");
 			for (int i = 1; i < res.size(); i++) {

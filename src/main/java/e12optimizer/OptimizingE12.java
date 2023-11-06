@@ -23,7 +23,7 @@ public class OptimizingE12 {
 	}
 
 	public static void main(String[] args) {
-		double[] multipliers = { 1e2, 1e3, 1e4, 1e5, 1e6 };
+		double[] multipliers = { 1e2, 1e3, 1e4 };
 
 		E_SERIES_TYPE e_series_type = E_SERIES_TYPE.E12;
 
@@ -46,12 +46,21 @@ public class OptimizingE12 {
 
 		minim_expression.setVariable("iq", 50e-6);
 
-		HashMap<String, DoubleArrayList> varValues = new HashMap<>();
+		HashMap<String, DoubleArrayList> variablesValues = new HashMap<>();
 		for (String variable : variables) {
-			varValues.put(variable, createValues(multipliers, e_series_type));
+			variablesValues.put(variable, createValues(multipliers, e_series_type));
 		}
 
-		ArrayList<DoubleArrayList> results = calculateExpressionError(varValues, minim_expression, result_expression);
+		// ArrayList<DoubleArrayList> results=calculateExpressionError(varValues, minim_expression, result_expression);
+
+		ArrayList<DoubleArrayList> results = new ArrayList<>();
+		calculateExpressionErrorRecursive(variablesValues, //
+				minim_expression, //
+				result_expression, //
+				results, //
+				new ArrayList<String>(variablesValues.keySet()), //
+				0, //
+				new DoubleArrayList()); //
 		sortResultsAscending(results);
 		printResults(results);
 	}
@@ -64,8 +73,12 @@ public class OptimizingE12 {
 			System.out.print((res.getDouble(1)) + "\t");
 			for (int i = 2; i < res.size(); i++) {
 				// print as a whole number (standard e-series value)
-				int v = (int) Math.round(res.getDouble(i));
-				System.out.print(v + "\t");
+				double val = res.getDouble(i);
+				if (val > 9.99) {
+					System.out.print((int) Math.round(val) + "\t");
+				} else {
+					System.out.print(val + "\t");
+				}
 			}
 			System.out.println();
 		}
@@ -80,7 +93,7 @@ public class OptimizingE12 {
 		});
 	}
 
-	private static ArrayList<DoubleArrayList> calculateExpressionError(HashMap<String, DoubleArrayList> varValues, Expression minim_expression,
+	private static ArrayList<DoubleArrayList> calculateExpressionErrorOLD(HashMap<String, DoubleArrayList> varValues, Expression minim_expression,
 			Expression result_expression) {
 		ArrayList<DoubleArrayList> results = new ArrayList<DoubleArrayList>();
 
@@ -92,12 +105,12 @@ public class OptimizingE12 {
 		String var0_name = varNames.get(0);
 		DoubleArrayList var0_values = varValues.get(var0_name);
 
-		String var1_name = varNames.get(1);
-		DoubleArrayList var1_values = varValues.get(var1_name);
-
 		for (double d0 : var0_values) {
 			minim_expression.setVariable(var0_name, d0);
 			result_expression.setVariable(var0_name, d0);
+
+			String var1_name = varNames.get(1);
+			DoubleArrayList var1_values = varValues.get(var1_name);
 
 			for (double d1 : var1_values) {
 				minim_expression.setVariable(var1_name, d1);
@@ -105,8 +118,8 @@ public class OptimizingE12 {
 
 				double error = minim_expression.evaluate();
 				double result = result_expression.evaluate();
-				// each result is of the form error result var0 ... varN
-				DoubleArrayList curResult = new DoubleArrayList(4);
+				// each result is of the form error, result, var0 ... varN
+				DoubleArrayList curResult = new DoubleArrayList();
 				curResult.add(error);
 				curResult.add(result);
 				curResult.add(d0);
@@ -115,6 +128,53 @@ public class OptimizingE12 {
 			}
 		}
 		return results;
+	}
+
+	private static void calculateExpressionErrorRecursive(HashMap<String, DoubleArrayList> varsValues, //
+			Expression minim_expression, //
+			Expression result_expression, //
+			ArrayList<DoubleArrayList> results, //
+			ArrayList<String> varNames, //
+			int varIndex, //
+			DoubleArrayList assignedVars) {
+
+		// ArrayList<String> varNames = new ArrayList<String>(varsValues.keySet());
+
+		String varName = varNames.get(varIndex);
+		DoubleArrayList varValues = varsValues.get(varName);
+
+		for (double x : varValues) {
+			minim_expression.setVariable(varName, x);
+			result_expression.setVariable(varName, x);
+
+			// last var?
+			if (varIndex == varNames.size() - 1) {
+
+				double error = minim_expression.evaluate();
+				double result = result_expression.evaluate();
+
+				// each result is of the form var0 ... varN, error, result,
+				DoubleArrayList curResult = new DoubleArrayList();
+				curResult.add(error);
+				curResult.add(result);
+				curResult.add(x);
+				for (int i = assignedVars.size() - 1; i >= 0; i--) {
+					curResult.add(assignedVars.getDouble(i));
+				}
+				results.add(curResult);
+			} else {
+				assignedVars.push(x);
+				calculateExpressionErrorRecursive(//
+						varsValues, //
+						minim_expression, //
+						result_expression, //
+						results, //
+						varNames, //
+						varIndex + 1, //
+						assignedVars);
+				assignedVars.popDouble();
+			}
+		}
 	}
 
 	private static HashSet<String> detectVariables(String expression) {
